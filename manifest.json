@@ -2,7 +2,7 @@
   "name": "AGS Cloud Composer",
   "short_name": "Cloud Composer",
   "description": "A granular synthesis audio composer using microphone or generated waveforms",
-  "start_url": "https://tokenno.github.io/ags/",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#1e3a8a",
   "theme_color": "#7c3aed",
