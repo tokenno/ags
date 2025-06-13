@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AGS Cloud Composer</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(135deg, #1e3a8a, #7c3aed);
+      min-height: 100vh;
+      font-family: 'Inter', sans-serif;
+      color: #fff;
+      padding: 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .container {
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(12px);
+      border-radius: 1.5rem;
+      padding: 1.5rem;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+    }
+    .btn {
+      background: linear-gradient(to right, #ec4899, #f97316);
+      padding: 0.75rem 1.5rem;
+      border-radius: 9999px;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+      text-align: center;
+      width: 100%;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+    }
+    .btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(236, 72, 153, 0.8);
+    }
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0.5rem 0;
+    }
+    .toggle {
+      appearance: none;
+      width: 3rem;
+      height: 1.5rem;
+      background: #4b5563;
+      border-radius: 9999px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .toggle:checked {
+      background: #10b981;
+    }
+    .toggle::before {
+      content: '';
+      position: absolute;
+      width: 1.25rem;
+      height: 1.25rem;
+      background: #fff;
+      border-radius: 50%;
+      top: 0.125rem;
+      left: 0.125rem;
+      transition: transform 0.3s;
+    }
+    .toggle:checked::before {
+      transform: translateX(1.5rem);
+    }
+    .slider-container {
+      margin: 0.75rem 0;
+    }
+    .slider-label {
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+      display: block;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: #ec4899;
+      height: 0.5rem;
+      border-radius: 0.25rem;
+    }
+    select {
+      background: #1f2937;
+      color: #fff;
+      border-radius: 0.5rem;
+      padding: 0.5rem;
+      width: 100%;
+      margin-bottom: 0.75rem;
+      font-size: 0.9rem;
+    }
+    #cloudCanvas {
+      width: 100%;
+      max-width: 600px;
+      height: 200px;
+      background: linear-gradient(to bottom, #111827, #1f2937);
+      border-radius: 1rem;
+      margin-top: 1rem;
+      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+    }
+    #status {
+      font-size: 0.9rem;
+      text-align: center;
+      margin-top: 0.75rem;
+      color: #d1d5db;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+    .recording .btn {
+      animation: pulse 1s infinite;
+    }
+    #startOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    #startOverlay.hidden {
+      display: none;
+    }
+    .accordion-header {
+      background: #1f2937;
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      transition: background 0.3s;
+    }
+    .accordion-header:hover {
+      background: #374151;
+    }
+    .accordion-content {
+      display: none;
+      padding: 0.75rem;
+    }
+    .accordion-content.active {
+      display: block;
+    }
+    .cloud-tab {
+      padding: 0.5rem 1rem;
+      background: #1f2937;
+      border-radius: 0.5rem 0.5rem 0 0;
+      cursor: pointer;
+      margin-right: 0.25rem;
+      transition: background 0.3s;
+    }
+    .cloud-tab.active {
+      background: #ec4899;
+    }
+    .cloud-tab:hover {
+      background: #374151;
+    }
+    .cloud-container {
+      display: none;
+    }
+    .cloud-container.active {
+      display: block;
+    }
+    @keyframes glow {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+    .grain {
+      animation: glow 0.5s ease-in-out;
+    }
+  </style>
+</head>
+<body>
+  <div id="startOverlay">
+    <button id="startButton" class="btn">Tap to Start</button>
+  </div>
+  <div class="container">
+    <h1 class="text-2xl font-bold text-center mb-6">AGS tOkeno Composer</h1>
+    <button id="recordButton" class="btn">Record 3s Sample</button>
+    <div class="flex mb-4">
+      <div class="cloud-tab active" data-cloud="0">Cloud 1</div>
+      <div class="cloud-tab" data-cloud="1">Cloud 2</div>
+    </div>
+    <button id="toggleCloudButton" class="btn" disabled>Start Cloud</button>
+    <div id="cloudContainer0" class="cloud-container active">
+      <div class="accordion-header">Source</div>
+      <div class="accordion-content active">
+        <div class="toggle-container">
+          <span>Use Sensors (Accel & Light)</span>
+          <input type="checkbox" id="sensorToggle0" class="toggle" checked>
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Source Type: <span id="sourceTypeValue0">Microphone</span></label>
+          <select id="sourceType0">
+            <option value="microphone" selected>Microphone</option>
+            <option value="sine">Sine Wave</option>
+            <option value="square">Square Wave</option>
+            <option value="sawtooth">Sawtooth Wave</option>
+            <option value="triangle">Triangle Wave</option>
+          </select>
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Base Frequency (Hz): <span id="baseFreqValue0">440</span></label>
+          <input type="range" id="baseFreq0" min="100" max="1000" value="440" disabled>
+        </div>
+      </div>
+      <div class="accordion-header">Grain Parameters</div>
+      <div class="accordion-content active">
+        <div class="slider-container">
+          <label class="slider-label">Grain Duration (ms): <span id="grainDurationValue0">20</span></label>
+          <input type="range" id="grainDuration0" min="15" max="80" value="20">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Grain Density (grains/s): <span id="grainDensityValue0">30</span></label>
+          <input type="range" id="grainDensity0" min="5" max="80" value="30" disabled>
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Fade In/Out Time (ms): <span id="fadeTimeValue0">2</span></label>
+          <input type="range" id="fadeTime0" min="0.5" max="5" step="0.1" value="2">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Envelope Type: <span id="envelopeTypeValue0">Cosine</span></label>
+          <select id="envelopeType0">
+            <option value="cosine" selected>Cosine (Smooth)</option>
+            <option value="hann">Hann (Classic)</option>
+            <option value="gaussian">Gaussian (Bell)</option>
+            <option value="linear">Linear (Basic)</option>
+          </select>
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Source Offset Randomness (0-1): <span id="offsetRandomValue0">1</span></label>
+          <input type="range" id="offsetRandom0" min="0" max="1" step="0.01" value="1">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Inter-Grain Delay Var (0-0.5): <span id="delayVarValue0">0.1</span></label>
+          <input type="range" id="delayVar0" min="0" max="0.5" step="0.01" value="0.1">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Number of Grains (0=inf): <span id="numGrainsValue0">10000</span></label>
+          <input type="range" id="numGrains0" min="0" max="10000" value="10000">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Panning Randomness (0-1): <span id="panRandomValue0">0.5</span></label>
+          <input type="range" id="panRandom0" min="0" max="1" step="0.01" value="0.5">
+        </div>
+      </div>
+      <div class="accordion-header">Effects</div>
+      <div class="accordion-content">
+        <div class="toggle-container">
+          <span>Delay Effect</span>
+          <input type="checkbox" id="delayToggle0" class="toggle">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Delay Time (ms): <span id="delayTimeValue0">500</span></label>
+          <input type="range" id="delayTime0" min="100" max="1000" value="500">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Delay Wet/Dry (0-1): <span id="delayWetValue0">0.5</span></label>
+          <input type="range" id="delayWet0" min="0" max="1" step="0.01" value="0.5">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Delay Feedback (0-0.8): <span id="delayFeedbackValue0">0.5</span></label>
+          <input type="range" id="delayFeedback0" min="0" max="0.8" step="0.01" value="0.5">
+        </div>
+        <div class="toggle-container">
+          <span>Bandpass Filter</span>
+          <input type="checkbox" id="bandpassToggle0" class="toggle">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Filter Frequency (Hz): <span id="filterFreqValue0">1000</span></label>
+          <input type="range" id="filterFreq0" min="100" max="5000" value="1000">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Filter Q (0.1-5): <span id="filterQValue0">1</span></label>
+          <input type="range" id="filterQ0" min="0.1" max="5" step="0.1" value="1">
+        </div>
+      </div>
+    </div>
+    <div id="cloudContainer1" class="cloud-container">
+      <div class="accordion-header">Source</div>
+      <div class="accordion-content active">
+        <div class="toggle-container">
+          <span>Use Sensors (Accel & Light)</span>
+          <input type="checkbox" id="sensorToggle1" class="toggle" checked>
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Source Type: <span id="sourceTypeValue1">Microphone</span></label>
+          <select id="sourceType1">
+            <option value="microphone" selected>Microphone</option>
+            <option value="sine">Sine Wave</option>
+            <option value="square">Square Wave</option>
+            <option value="sawtooth">Sawtooth Wave</option>
+            <option value="triangle">Triangle Wave</option>
+          </select>
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Base Frequency (Hz): <span id="baseFreqValue1">440</span></label>
+          <input type="range" id="baseFreq1" min="100" max="1000" value="440" disabled>
+        </div>
+      </div>
+      <div class="accordion-header">Grain Parameters</div>
+      <div class="accordion-content active">
+        <div class="slider-container">
+          <label class="slider-label">Grain Duration (ms): <span id="grainDurationValue1">20</span></label>
+          <input type="range" id="grainDuration1" min="15" max="80" value="20">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Grain Density (grains/s): <span id="grainDensityValue1">30</span></label>
+          <input type="range" id="grainDensity1" min="5" max="80" value="30" disabled>
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Fade In/Out Time (ms): <span id="fadeTimeValue1">2</span></label>
+          <input type="range" id="fadeTime1" min="0.5" max="5" step="0.1" value="2">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Envelope Type: <span id="envelopeTypeValue1">Cosine</span></label>
+          <select id="envelopeType1">
+            <option value="cosine" selected>Cosine (Smooth)</option>
+            <option value="hann">Hann (Classic)</option>
+            <option value="gaussian">Gaussian (Bell)</option>
+            <option value="linear">Linear (Basic)</option>
+          </select>
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Source Offset Randomness (0-1): <span id="offsetRandomValue1">1</span></label>
+          <input type="range" id="offsetRandom1" min="0" max="1" step="0.01" value="1">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Inter-Grain Delay Var (0-0.5): <span id="delayVarValue1">0.1</span></label>
+          <input type="range" id="delayVar1" min="0" max="0.5" step="0.01" value="0.1">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Number of Grains (0=inf): <span id="numGrainsValue1">10000</span></label>
+          <input type="range" id="numGrains1" min="0" max="10000" value="10000">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Panning Randomness (0-1): <span id="panRandomValue1">0.5</span></label>
+          <input type="range" id="panRandom1" min="0" max="1" step="0.01" value="0.5">
+        </div>
+      </div>
+      <div class="accordion-header">Effects</div>
+      <div class="accordion-content">
+        <div class="toggle-container">
+          <span>Delay Effect</span>
+          <input type="checkbox" id="delayToggle1" class="toggle">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Delay Time (ms): <span id="delayTimeValue1">500</span></label>
+          <input type="range" id="delayTime1" min="100" max="1000" value="500">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Delay Wet/Dry (0-1): <span id="delayWetValue1">0.5</span></label>
+          <input type="range" id="delayWet1" min="0" max="1" step="0.01" value="0.5">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Delay Feedback (0-0.8): <span id="delayFeedbackValue1">0.5</span></label>
+          <input type="range" id="delayFeedback1" min="0" max="0.8" step="0.01" value="0.5">
+        </div>
+        <div class="toggle-container">
+          <span>Bandpass Filter</span>
+          <input type="checkbox" id="bandpassToggle1" class="toggle">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Filter Frequency (Hz): <span id="filterFreqValue1">1000</span></label>
+          <input type="range" id="filterFreq1" min="100" max="5000" value="1000">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label">Filter Q (0.1-5): <span id="filterQValue1">1</span></label>
+          <input type="range" id="filterQ1" min="0.1" max="5" step="0.1" value="1">
+        </div>
+      </div>
+    </div>
+    <canvas id="cloudCanvas"></canvas>
+    <p id="status">Status: Ready (Serve over HTTPS for microphone access)</p>
+  </div>
+
+  <script>
+    // UI elements
+    const startOverlay = document.getElementById('startOverlay');
+    const startButton = document.getElementById('startButton');
+    const recordButton = document.getElementById('recordButton');
+    const toggleCloudButton = document.getElementById('toggleCloudButton');
+    const cloudTabs = document.querySelectorAll('.cloud-tab');
+    const statusElement = document.getElementById('status');
+    const cloudCanvas = document.getElementById('cloudCanvas');
+    const ctx = cloudCanvas.getContext('2d');
+
+    // Audio variables
+    let audioContext = null;
+    let audioBuffer = null;
+    let mediaStream = null;
+    let clouds = [];
+    let analyser = null;
+    let keepAliveOscillator = null;
+
+    // Sensor variables
+    let accelerometerData = { x: 0 };
+    let lightLevel = 440; // Default light level
+
+    // Canvas setup
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      cloudCanvas.width = cloudCanvas.offsetWidth * dpr;
+      cloudCanvas.height = cloudCanvas.offsetHeight * dpr;
+      ctx.scale(dpr, dpr);
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Envelope functions
+    const envelopeFunctions = {
+      cosine: (t, duration) => 0.5 * (1 - Math.cos(Math.PI * t / duration)),
+      hann: (t, duration) => 0.5 * (1 - Math.cos(2 * Math.PI * t / duration)),
+      gaussian: (t, duration) => {
+        const sigma = duration / 4;
+        const mu = duration / 2;
+        return Math.exp(-((t - mu) ** 2) / (2 * sigma ** 2));
+      },
+      linear: (t, duration) => t / duration
+    };
+
+    // Apply envelope
+    function applyEnvelope(gainNode, startTime, grainDuration, fadeTime, envelopeType) {
+      const sustainDuration = grainDuration - 2 * fadeTime;
+      if (sustainDuration < 0) return;
+
+      const maxGain = 0.7;
+      const steps = 20;
+
+      // Fade in
+      for (let i = 0; i <= steps; i++) {
+        const t = (i / steps) * fadeTime;
+        const envValue = envelopeFunctions[envelopeType](t, fadeTime);
+        gainNode.gain.setValueAtTime(maxGain * envValue, startTime + t);
+      }
+
+      // Sustain
+      gainNode.gain.setValueAtTime(maxGain, startTime + fadeTime);
+      gainNode.gain.setValueAtTime(maxGain, startTime + fadeTime + sustainDuration);
+
+      // Fade out
+      for (let i = 0; i <= steps; i++) {
+        const t = (i / steps) * fadeTime;
+        const envValue = envelopeFunctions[envelopeType](fadeTime - t, fadeTime);
+        gainNode.gain.setValueAtTime(maxGain * envValue, startTime + fadeTime + sustainDuration + t);
+      }
+
+      // Ensure zero at end
+      gainNode.gain.setValueAtTime(0, startTime + grainDuration);
+    }
+
+    // Sensor toggle handling
+    function setupSensorToggles() {
+      [0, 1].forEach(cloudId => {
+        const sensorToggle = document.getElementById(`sensorToggle${cloudId}`);
+        const baseFreqSlider = document.getElementById(`baseFreq${cloudId}`);
+        const grainDensitySlider = document.getElementById(`grainDensity${cloudId}`);
+        
+        sensorToggle.addEventListener('change', () => {
+          const useSensors = sensorToggle.checked;
+          baseFreqSlider.disabled = useSensors;
+          grainDensitySlider.disabled = useSensors;
+          if (!useSensors) {
+            // Set default values when sensors are disabled
+            document.getElementById(`baseFreqValue${cloudId}`).textContent = baseFreqSlider.value;
+            document.getElementById(`grainDensityValue${cloudId}`).textContent = grainDensitySlider.value;
+            if (clouds[cloudId]) clouds[cloudId].updateParameters();
+          }
+        });
+      });
+    }
+
+    // Accelerometer handling
+    function setupAccelerometer() {
+      if ('DeviceMotionEvent' in window) {
+        if (typeof DeviceMotionEvent.requestPermission === 'function') {
+          DeviceMotionEvent.requestPermission().then(permissionState => {
+            if (permissionState === 'granted') {
+              window.addEventListener('devicemotion', (event) => {
+                accelerometerData.x = event.accelerationIncludingGravity.x || 0;
+                updateGrainDensityFromAccelerometer();
+              });
+            } else {
+              statusElement.textContent = 'Status: Accelerometer permission denied';
+            }
+          }).catch(err => {
+            console.error('Accelerometer permission error:', err);
+            statusElement.textContent = `Status: Accelerometer error: ${err.message}`;
+          });
+        } else {
+          window.addEventListener('devicemotion', (event) => {
+            accelerometerData.x = event.accelerationIncludingGravity.x || 0;
+            updateGrainDensityFromAccelerometer();
+          });
+        }
+      } else {
+        statusElement.textContent = 'Status: Accelerometer not supported';
+      }
+    }
+
+    function updateGrainDensityFromAccelerometer() {
+      [0, 1].forEach(cloudId => {
+        if (document.getElementById(`sensorToggle${cloudId}`).checked) {
+          const normalizedAccel = Math.abs(accelerometerData.x) / 10; // Normalize accel (assuming max ~10g)
+          const density = 5 + (normalizedAccel * 75); // Map to 5-80 range
+          document.getElementById(`grainDensityValue${cloudId}`).textContent = density.toFixed(1);
+          document.getElementById(`grainDensity${cloudId}`).value = density;
+          if (clouds[cloudId]) clouds[cloudId].updateParameters();
+        }
+      });
+    }
+
+    // Light sensor handling
+    function setupLightSensor() {
+      if ('AmbientLightSensor' in window) {
+        try {
+          const sensor = new AmbientLightSensor();
+          sensor.onreading = () => {
+            lightLevel = Math.max(100, Math.min(1000, sensor.illuminance * 0.5)); // Map lux to 100-1000 Hz
+            [0, 1].forEach(cloudId => {
+              if (document.getElementById(`sensorToggle${cloudId}`).checked) {
+                document.getElementById(`baseFreqValue${cloudId}`).textContent = lightLevel.toFixed(0);
+                document.getElementById(`baseFreq${cloudId}`).value = lightLevel;
+                if (clouds[cloudId]) clouds[cloudId].updateParameters();
+              }
+            });
+          };
+          sensor.onerror = (event) => {
+            console.error('Light sensor error:', event.error);
+            statusElement.textContent = `Status: Light sensor error: ${event.error.message}`;
+          };
+          sensor.start();
+        } catch (err) {
+          console.error('Light sensor initialization failed:', err);
+          statusElement.textContent = `Status: Light sensor error: ${err.message}`;
+        }
+      } else {
+        statusElement.textContent = 'Status: Light sensor not supported';
+      }
+    }
+
+    // Cloud class
+    class Cloud {
+      constructor(id) {
+        this.id = id;
+        this.delayNode = audioContext.createDelay(1);
+        this.delayWetGain = audioContext.createGain();
+        this.delayDryGain = audioContext.createGain();
+        this.delayFeedbackGain = audioContext.createGain();
+        this.bandpassFilter = audioContext.createBiquadFilter();
+        this.bandpassFilter.type = 'bandpass';
+
+        // Connect delay
+        this.delayNode.connect(this.delayFeedbackGain);
+        this.delayFeedbackGain.connect(this.delayNode);
+        this.delayNode.connect(this.delayWetGain);
+
+        this.updateParameters();
+      }
+
+      getParameters() {
+        const useSensors = document.getElementById(`sensorToggle${this.id}`).checked;
+        const rawParams = {
+          sourceType: document.getElementById(`sourceType${this.id}`).value,
+          baseFreq: useSensors ? lightLevel : parseFloat(document.getElementById(`baseFreq${this.id}`).value),
+          grainDuration: parseFloat(document.getElementById(`grainDuration${this.id}`).value) / 1000,
+          grainDensity: useSensors ? parseFloat(document.getElementById(`grainDensityValue${this.id}`).textContent) : parseFloat(document.getElementById(`grainDensity${this.id}`).value),
+          fadeTime: parseFloat(document.getElementById(`fadeTime${this.id}`).value) / 1000,
+          envelopeType: document.getElementById(`envelopeType${this.id}`).value,
+          offsetRandom: parseFloat(document.getElementById(`offsetRandom${this.id}`).value),
+          delayVar: parseFloat(document.getElementById(`delayVar${this.id}`).value),
+          numGrains: parseInt(document.getElementById(`numGrains${this.id}`).value),
+          panRandom: parseFloat(document.getElementById(`panRandom${this.id}`).value),
+          delayEnabled: document.getElementById(`delayToggle${this.id}`).checked,
+          delayTime: parseFloat(document.getElementById(`delayTime${this.id}`).value) / 1000,
+          delayWet: parseFloat(document.getElementById(`delayWet${this.id}`).value),
+          delayFeedback: parseFloat(document.getElementById(`delayFeedback${this.id}`).value),
+          bandpassEnabled: document.getElementById(`bandpassToggle${this.id}`).checked,
+          filterFreq: parseFloat(document.getElementById(`filterFreq${this.id}`).value),
+          filterQ: parseFloat(document.getElementById(`filterQ${this.id}`).value)
+        };
+
+        // Apply constraints
+        rawParams.grainDuration = Math.max(0.015, Math.min(0.08, rawParams.grainDuration));
+        rawParams.grainDensity = Math.max(5, Math.min(80, rawParams.grainDensity));
+        rawParams.fadeTime = Math.max(0.0005, Math.min(rawParams.fadeTime, rawParams.grainDuration / 2));
+        rawParams.delayFeedback = Math.min(0.8, rawParams.delayFeedback);
+        rawParams.filterQ = Math.max(0.1, Math.min(5, rawParams.filterQ));
+
+        return rawParams;
+      }
+
+      updateParameters() {
+        const params = this.getParameters();
+        this.delayNode.delayTime.value = params.delayTime;
+        this.delayWetGain.gain.value = params.delayEnabled ? params.delayWet : 0;
+        this.delayDryGain.gain.value = params.delayEnabled ? 1 - params.delayWet : 1;
+        this.delayFeedbackGain.gain.value = params.delayEnabled ? params.delayFeedback : 0;
+        this.bandpassFilter.frequency.value = params.bandpassEnabled ? params.filterFreq : 20000;
+        this.bandpassFilter.Q.value = params.bandpassEnabled ? params.filterQ : 0.001;
+      }
+
+      scheduleGrain(cloudState, nextTime = audioContext.currentTime) {
+        if (!cloudState.isRunning || (!audioBuffer && this.getParameters().sourceType === 'microphone') || 
+            (cloudState.grainsPlayed >= this.getParameters().numGrains && this.getParameters().numGrains !== 0)) {
+          cloudState.isRunning = false;
+          toggleCloudButton.textContent = 'Start Cloud';
+          statusElement.textContent = `Status: Cloud ${this.id + 1} stopped${cloudState.grainsPlayed >= this.getParameters().numGrains ? ' (grain limit reached)' : ''}`;
+          return;
+        }
+
+        const params = this.getParameters();
+        let source;
+
+        // Create source based on type
+        if (params.sourceType === 'microphone') {
+          if (!audioBuffer) return;
+          source = audioContext.createBufferSource();
+          source.buffer = audioBuffer;
+        } else {
+          source = audioContext.createOscillator();
+          source.type = params.sourceType;
+          source.frequency.setValueAtTime(params.baseFreq, nextTime);
+          // Random detune
+          source.detune.setValueAtTime((Math.random() - 0.5) * 50, nextTime);
+        }
+
+        // Random pitch variation
+        const pitch = 0.8 + Math.random() * 0.4;
+        if (params.sourceType === 'microphone') {
+          source.playbackRate.value = pitch;
+        } else {
+          source.frequency.setValueAtTime(params.baseFreq * pitch, nextTime);
+        }
+
+        const offset = params.sourceType === 'microphone' ? Math.max(0, params.offsetRandom * Math.random() * (audioBuffer.duration - params.grainDuration)) : 0;
+        const pan = params.panRandom * (Math.random() - 0.5);
+
+        // Gain envelope
+        const gain = audioContext.createGain();
+        applyEnvelope(gain, nextTime, params.grainDuration, params.fadeTime, params.envelopeType);
+
+        // Panning
+        const panner = audioContext.createStereoPanner();
+        panner.pan.value = pan;
+
+        // Connect audio graph
+        source.connect(gain);
+        gain.connect(panner);
+        panner.connect(params.bandpassEnabled ? this.bandpassFilter : this.delayDryGain);
+        if (params.bandpassEnabled) this.bandpassFilter.connect(this.delayDryGain);
+        this.delayDryGain.connect(analyser);
+        this.delayWetGain.connect(analyser);
+        analyser.connect(audioContext.destination);
+
+        source.start(nextTime, params.sourceType === 'microphone' ? offset : undefined);
+        source.stop(nextTime + 2 * params.grainDuration); // Aid cleanup
+        cloudState.grainsPlayed++;
+
+        // Visualize grain
+        drawGrain(this.id, pan, cloudState.grainsPlayed / (params.numGrains || 10000), params.grainDensity, params.sourceType, params.envelopeType);
+
+        // Schedule next grain
+        const delay = (1 / (params.grainDensity * (1 + (Math.random() - 0.5) * params.delayVar)));
+        nextTime += delay;
+        if (nextTime < audioContext.currentTime + 0.1) {
+          this.scheduleGrain(cloudState, nextTime);
+        } else {
+          const timeoutDelay = (nextTime - audioContext.currentTime) * 1000;
+          cloudState.timeoutId = setTimeout(() => this.scheduleGrain(cloudState, nextTime), timeoutDelay);
+        }
+      }
+    }
+
+    // Initialize AudioContext
+    function initAudioContext(event) {
+      event.preventDefault(); // Prevent default for touch/click
+
+      try {
+        // Create AudioContext if not initialized
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          analyser = audioContext.createAnalyser();
+          analyser.fftSize = 32; // Minimal FFT for low overhead
+
+          // Keep-alive oscillator to prevent suspension
+          keepAliveOscillator = audioContext.createOscillator();
+          keepAliveOscillator.type = 'sine';
+          keepAliveOscillator.frequency.setValueAtTime(0, audioContext.currentTime);
+          const gain = audioContext.createGain();
+          gain.gain.setValueAtTime(0, audioContext.currentTime);
+          keepAliveOscillator.connect(gain);
+          gain.connect(audioContext.destination);
+          keepAliveOscillator.start();
+
+          // Initialize sensors and toggles
+          setupSensorToggles();
+          setupAccelerometer();
+          setupLightSensor();
+
+          statusElement.textContent = 'Status: AudioContext created';
+        }
+
+        // Resume if suspended
+        if (audioContext.state === 'suspended') {
+          statusElement.textContent = 'Status: Resuming AudioContext...';
+          audioContext.resume().then(() => {
+            statusElement.textContent = 'Status: AudioContext running';
+            startOverlay.classList.add('hidden'); // Hide overlay on success
+          }).catch(err => {
+            console.error('Resume failed:', err);
+            statusElement.textContent = `Status: Failed to resume AudioContext: ${err.message}. Use HTTPS.`;
+          });
+        } else {
+          statusElement.textContent = 'Status: AudioContext running';
+          startOverlay.classList.add('hidden'); // Hide overlay if already running
+        }
+      } catch (err) {
+        console.error('AudioContext initialization failed:', err);
+        statusElement.textContent = `Status: Failed to initialize AudioContext: ${err.message}. Ensure HTTPS and user interaction.`;
+      }
+    }
+
+    // Record audio
+    async function recordSample() {
+      if (!audioContext) {
+        statusElement.textContent = 'Status: AudioContext not initialized';
+        return;
+      }
+
+      try {
+        recordButton.disabled = true;
+        recordButton.classList.add('recording');
+        statusElement.textContent = 'Status: Requesting microphone access...';
+
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const source = audioContext.createMediaStreamSource(mediaStream);
+
+        const bufferLength = audioContext.sampleRate * 3;
+        const tempBuffer = audioContext.createBuffer(1, bufferLength, audioContext.sampleRate);
+        const data = tempBuffer.getChannelData(0);
+        let writeIndex = 0;
+
+        const processor = audioContext.createScriptProcessor(2048, 1, 1);
+        processor.onaudioprocess = (e) => {
+          const input = e.inputBuffer.getChannelData(0);
+          for (let i = 0; i < input.length && writeIndex < bufferLength; i++) {
+            data[writeIndex++] = input[i];
+          }
+          if (writeIndex >= bufferLength) {
+            processor.disconnect();
+            source.disconnect();
+            mediaStream.getTracks().forEach(track => track.stop());
+            finalizeRecording(tempBuffer);
+          }
+        };
+
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+        statusElement.textContent = 'Status: Recording... (3 seconds)';
+      } catch (error) {
+        console.error('Microphone access error:', error);
+        statusElement.textContent = `Status: Error accessing microphone: ${error.message}. Ensure HTTPS.`;
+        recordButton.disabled = false;
+        recordButton.classList.remove('recording');
+      }
+    }
+
+    // Finalize recording
+    function finalizeRecording(tempBuffer) {
+      audioBuffer = tempBuffer;
+      toggleCloudButton.disabled = false;
+      recordButton.disabled = false;
+      recordButton.classList.remove('recording');
+      clouds = [new Cloud(0), new Cloud(1)];
+      statusElement.textContent = 'Status: Sample recorded. Ready to start clouds.';
+    }
+
+    // Toggle cloud
+    function toggleCloud() {
+      if (!audioContext || (!audioBuffer && clouds[parseInt(cloudTabs[0].classList.contains('active') ? 0 : 1)].getParameters().sourceType === 'microphone')) {
+        statusElement.textContent = 'Status: No audio context or sample available';
+        return;
+      }
+
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().then(() => {
+          statusElement.textContent = 'Status: AudioContext resumed';
+          handleCloudToggle();
+        }).catch(err => {
+          console.error('Resume error:', err);
+          statusElement.textContent = `Status: Error resuming AudioContext: ${err.message}`;
+        });
+        return;
+      }
+
+      handleCloudToggle();
+    }
+
+    function handleCloudToggle() {
+      const cloudIndex = parseInt(cloudTabs[0].classList.contains('active') ? 0 : 1);
+      const cloudState = clouds[cloudIndex];
+      cloudState.isRunning = !cloudState.isRunning;
+      toggleCloudButton.textContent = cloudState.isRunning ? 'Stop Cloud' : 'Start Cloud';
+
+      if (cloudState.isRunning) {
+        cloudState.grainsPlayed = 0;
+        statusElement.textContent = `Status: Cloud ${cloudIndex + 1} running`;
+        clouds[cloudIndex].scheduleGrain(cloudState);
+      } else {
+        if (cloudState.timeoutId) {
+          clearTimeout(cloudState.timeoutId);
+          cloudState.timeoutId = null;
+        }
+        statusElement.textContent = `Status: Cloud ${cloudIndex + 1} stopped`;
+      }
+    }
+
+    // Visualize grains
+    let grainPositions = [[], []];
+    const waveformColors = {
+      microphone: '#ec4899',
+      sine: '#3b82f6',
+      square: '#ef4444',
+      sawtooth: '#f59e0b',
+      triangle: '#10b981'
+    };
+    function drawGrain(cloudId, pan, progress, density, sourceType, envelopeType) {
+      const x = (pan + 1) * cloudCanvas.offsetWidth / 2;
+      const y = (1 - progress) * cloudCanvas.offsetHeight;
+      const size = Math.min(8, 2 + density / 15);
+      const opacity = envelopeType === 'gaussian' ? 0.6 : 0.8;
+      grainPositions[cloudId].push({ x, y, time: Date.now(), size, sourceType, opacity });
+
+      if (grainPositions[cloudId].length > 100) grainPositions[cloudId].shift();
+
+      function render() {
+        ctx.clearRect(0, 0, cloudCanvas.width, cloudCanvas.height);
+        grainPositions.forEach((positions, id) => {
+          positions.forEach(pos => {
+            const age = (Date.now() - pos.time) / 2000;
+            if (age > 1) return;
+            ctx.globalAlpha = pos.opacity * (1 - age);
+            ctx.fillStyle = waveformColors[pos.sourceType];
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, pos.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          });
+        });
+        requestAnimationFrame(render);
+      }
+      render();
+    }
+
+    // Update UI values
+    function setupSliders(cloudId) {
+      const sliders = [
+        { id: `sourceType${cloudId}`, valueId: `sourceTypeValue${cloudId}`, type: 'select' },
+        { id: `baseFreq${cloudId}`, valueId: `baseFreqValue${cloudId}` },
+        { id: `grainDuration${cloudId}`, valueId: `grainDurationValue${cloudId}` },
+        { id: `grainDensity${cloudId}`, valueId: `grainDensityValue${cloudId}` },
+        { id: `fadeTime${cloudId}`, valueId: `fadeTimeValue${cloudId}`, format: x => x.toFixed(1) },
+        { id: `envelopeType${cloudId}`, valueId: `envelopeTypeValue${cloudId}`, type: 'select' },
+        { id: `offsetRandom${cloudId}`, valueId: `offsetRandomValue${cloudId}`, format: x => x.toFixed(2) },
+        { id: `delayVar${cloudId}`, valueId: `delayVarValue${cloudId}`, format: x => x.toFixed(2) },
+        { id: `numGrains${cloudId}`, valueId: `numGrainsValue${cloudId}` },
+        { id: `panRandom${cloudId}`, valueId: `panRandomValue${cloudId}`, format: x => x.toFixed(2) },
+        { id: `delayTime${cloudId}`, valueId: `delayTimeValue${cloudId}` },
+        { id: `delayWet${cloudId}`, valueId: `delayWetValue${cloudId}`, format: x => x.toFixed(2) },
+        { id: `delayFeedback${cloudId}`, valueId: `delayFeedbackValue${cloudId}`, format: x => x.toFixed(2) },
+        { id: `filterFreq${cloudId}`, valueId: `filterFreqValue${cloudId}` },
+        { id: `filterQ${cloudId}`, valueId: `filterQValue${cloudId}`, format: x => x.toFixed(1) }
+      ];
+
+      sliders.forEach(slider => {
+        const input = document.getElementById(slider.id);
+        input.addEventListener(slider.type === 'select' ? 'change' : 'input', () => {
+          const value = slider.type === 'select' ? input.options[input.selectedIndex].text : parseFloat(input.value);
+          document.getElementById(slider.valueId).textContent = slider.format ? slider.format(value) : value;
+          if (clouds[cloudId]) clouds[cloudId].updateParameters();
+        });
+      });
+
+      document.getElementById(`delayToggle${cloudId}`).addEventListener('change', () => clouds[cloudId] && clouds[cloudId].updateParameters());
+      document.getElementById(`bandpassToggle${cloudId}`).addEventListener('change', () => clouds[cloudId] && clouds[cloudId].updateParameters());
+    }
+
+    // Accordion functionality
+    document.querySelectorAll('.accordion-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const content = header.nextElementSibling;
+        content.classList.toggle('active');
+      });
+    });
+
+    // Tab functionality
+    cloudTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        cloudTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelectorAll('.cloud-container').forEach((container, i) => {
+          container.classList.toggle('active', i === parseInt(tab.dataset.cloud));
+        });
+        const cloudIndex = parseInt(tab.dataset.cloud);
+        toggleCloudButton.textContent = clouds[cloudIndex]?.isRunning ? 'Stop Cloud' : 'Start Cloud';
+      });
+    });
+
+    // Event listeners
+    function addStartListeners() {
+      startButton.removeEventListener('click', initAudioContext);
+      startButton.removeEventListener('touchstart', initAudioContext);
+      startButton.addEventListener('click', initAudioContext, { once: true, passive: false });
+      startButton.addEventListener('touchstart', initAudioContext, { once: true, passive: false });
+    }
+    addStartListeners();
+    recordButton.addEventListener('click', recordSample);
+    toggleCloudButton.addEventListener('click', toggleCloud);
+
+    // Initialize sliders
+    setupSliders(0);
+    setupSliders(1);
+  </script>
+</body>
+</html>
